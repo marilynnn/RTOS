@@ -6,23 +6,35 @@
 
 #define MAX_FILE_SIZE 1000
 
-struct cmd_params {
+struct params {
     size_t a;
     size_t c;
     size_t m;
     size_t x;
     const char* input;
     const char* output;
-}; //струкутура с аргументами командной строки
+    size_t file_size;
+}; 
 
-struct chunk {
+void* get_lkg_seq (params& prms) {
+   
+   size_t sz = prms.file_size/sizeof(int)-1; 
+   int* psp = new int [sz];
 
-}; // стурктура с данными для обработки
+   size_t a = prms.a;
+   size_t b = prms.c;
+   size_t m = prms.m;
+   size_t x = prms.x;
+   psp[0] = x;
 
+   for (size_t i = 0, i < sz - 1, ++i) {
+      psp[i+1]
+   }
+}; 
 int main(int argc, char* argv[]) {
 
     int arg = 0;
-    cmd_params params;
+    params prms;
 
 
     if (argc != 13) {

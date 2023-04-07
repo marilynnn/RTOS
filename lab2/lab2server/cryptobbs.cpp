@@ -14,7 +14,7 @@ static resmgr_io_funcs_t io_funcs;
 static iofunc_attr_t attr;
 
 std::uint32_t last_el;
-bbs::BBSParams *param;
+bbs::BBSParams param;
 
 std::uint32_t parity_bit(uint32_t x) {
 	std::uint32_t y = 0;
@@ -27,7 +27,7 @@ std::uint32_t parity_bit(uint32_t x) {
 std::uint32_t getElem() {
 	std::uint32_t x = 0;
 	std::uint32_t y = 0;
-	std::uint32_t M = param->p * param->q;
+	std::uint32_t M = param.p * param.q;
 
 	for (int i = 0; i < sizeof(uint32_t) * 8; ++i) {
 		x = last_el * last_el % M;
@@ -52,8 +52,8 @@ int io_devctl(resmgr_context_t *ctp, io_devctl_t *msg, iofunc_ocb_t *ocb) {
 
 	switch (msg->i.dcmd) {
 	case _SET_PARAMS: {
-		param = reinterpret_cast<bbs::BBSParams *>(rx_data);
-		last_el = param->seed;
+		memcpy(&param, reinterpret_cast<bbs::BBSParams *>(rx_data), sizeof(bbs::BBSParams));
+		last_el = param.seed;
 		break;
 	}
 	case _GET_ELEM: {

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <string.h>
+#include <memory>
 #define THREAD_POOL_PARAM_T dispatch_context_t
 #include <sys/iofunc.h>
 #include <sys/dispatch.h>
@@ -23,10 +24,11 @@ static iofunc_attr_t attr;
 
 
 struct prms{
-	std::uint32_t last_el;
-	bbs::BBSParams *param;
+	std::uint32_t last_el = 0;
+	bbs::BBSParams param;
 };
-std::map <std::int32_t, prms*> clients;
+
+std::map <std::int32_t, std::shared_ptr<prms>> clients;
 
 std::uint32_t parity_bit(uint32_t x) {
 	std::uint32_t y = 0;
@@ -42,7 +44,7 @@ std::uint32_t getElem(std::int32_t cl_id) {
 	{
 		std::lock_guard<std::mutex> lock(mtx);
 
-		std::uint32_t M = clients[cl_id]->param->p * clients[cl_id]->param->q;
+		std::uint32_t M = clients[cl_id]->param.p * clients[cl_id]->param.q;
 		for (int i = 0; i < sizeof(uint32_t) * 8; ++i) {
 			x = clients[cl_id]->last_el * clients[cl_id]->last_el % M;
 			clients[cl_id]->last_el = x;
@@ -56,8 +58,7 @@ std::uint32_t getElem(std::int32_t cl_id) {
 int io_open (resmgr_context_t * ctp , io_open_t * msg , RESMGR_HANDLE_T * handle , void * extra ){
 	{
 		std::lock_guard<std::mutex> lock(mtx);
-		clients[ctp->info.scoid] = new prms();
-		clients[ctp->info.scoid]->param = new bbs::BBSParams();
+		clients.insert({ctp->info.scoid, std::make_shared<prms>()});
 	}
 		std::cout << "CLIENT:\t" << ctp->info.scoid << "\tCONNECTED\n";
 		return (iofunc_open_default (ctp, msg, handle, extra));
@@ -65,22 +66,19 @@ int io_open (resmgr_context_t * ctp , io_open_t * msg , RESMGR_HANDLE_T * handle
 
 int io_close(resmgr_context_t *ctp, io_close_t *msg, iofunc_ocb_t *ocb)
 {
-	{
+		{
 		std::lock_guard<std::mutex> lock(mtx);
 
-		std::map <std::int32_t, prms*> :: iterator it;
-		it = clients.find(ctp->info.scoid);
-		if (clients.count(ctp->info.scoid))
+		auto it = clients.find(ctp->info.scoid);
+		if (it != clients.end())
 		{
-			delete clients[ctp->info.scoid]->param;
-			delete clients[ctp->info.scoid];
 			clients.erase(it);
-					std::cout << "CLIENT:\t" << ctp->info.scoid << "\tCLOSE\n";
-				}
-				else
-					std::cout << "CLIENT = \t" << ctp->info.scoid << " not found" << std::endl;
-	}
-			return (iofunc_close_dup_default(ctp, msg, ocb));
+			std::cout << "CLIENT:\t" << ctp->info.scoid << "\tCLOSE\n";
+		}
+		else
+		std::cout << "CLIENT = \t" << ctp->info.scoid << " not found" << std::endl;
+		}
+		return (iofunc_close_dup_default(ctp, msg, ocb));
 };
 
 int io_devctl(resmgr_context_t *ctp, io_devctl_t *msg, iofunc_ocb_t *ocb) {
@@ -98,12 +96,8 @@ int io_devctl(resmgr_context_t *ctp, io_devctl_t *msg, iofunc_ocb_t *ocb) {
 	case _SET_PARAMS: {
 		{
 		std::lock_guard<std::mutex> lock(mtx);
-
-		bbs::BBSParams* tmp_param = reinterpret_cast<bbs::BBSParams*> (rx_data);
-		clients[cl_id]->param->p = tmp_param->p;
-		clients[cl_id]->param->q = tmp_param->q;
-		clients[cl_id]->param->seed = tmp_param->seed;
-		clients[cl_id]->last_el = clients[cl_id]->param->seed;
+		memcpy(&clients[cl_id]->param, reinterpret_cast<bbs::BBSParams *> (rx_data), sizeof(bbs::BBSParams));
+		clients[cl_id]->last_el = clients[cl_id]->param.seed;
 		}
 		break;
 	}
@@ -196,4 +190,3 @@ int main(int argc, char **argv) {
 
 	return EXIT_SUCCESS; // never go here
 }
-
